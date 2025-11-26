@@ -1,0 +1,29 @@
+{
+  "id": "community.crunchyroll.reborn",
+  "version": "2.4.0",
+  "name": "Crunchyroll Reborn",
+  "description": "The real Crunchyroll experience in Stremio — Simulcasts, Seasons, Genres, Dubbed & Subbed",
+  "icon": "https://i.imgur.com/2G4oO3k.png",
+  "background": "https://i.imgur.com/2TWBW8z.jpg",
+  "logo": "https://upload.wikimedia.org/wikipedia/commons/1/1a/Crunchyroll_Logo.png",
+  "types": ["series"],
+  "catalogs": [
+    { "type": "series", "id": "cr-simulcast", "name": "Simulcast" },
+    { "type": "series", "id": "cr-popular", "name": "Popular" },
+    { "type": "series", "id": "cr-updated", "name": "Recently Updated" },
+    { "type": "series", "id": "cr-new", "name": "Newly Added" },
+    { "type": "series", "id": "cr-dubbed", "name": "Dubbed" },
+    { "type": "series", "id": "cr-genres", "name": "Genres", "extra": [{ "name": "genre" }] },
+    { "type": "series", "id": "cr-season-fall-2025", "name": "Fall 2025" },
+    { "type": "series", "id": "cr-season-summer-2025", "name": "Summer 2025" },
+    { "type": "series", "id": "cr-season-spring-2025", "name": "Spring 2025" },
+    { "type": "series", "id": "cr-season-winter-2025", "name": "Winter 2025" }
+  ],
+  "resources": ["catalog", "meta", "stream"],
+  "idPrefixes": ["anilist:", "mal:"],
+  "behaviorHints": {
+    "adult": false,
+    "p2p": false,
+    "configurable": false
+  }
+}
