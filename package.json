@@ -1,9 +1,9 @@
 {
   "name": "stremio-crunchyroll-reborn",
-  "version": "2.4.0",
+  "version": "1.0.0",
   "main": "index.js",
   "dependencies": {
-    "stremio-addon-sdk": "^2.0.0",
+    "stremio-addon-sdk": "^1.6.10",
     "axios": "^1.7.0"
   },
   "scripts": {
