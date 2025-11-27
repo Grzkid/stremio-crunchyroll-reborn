@@ -76,8 +76,8 @@ builder.defineStreamHandler(async (args) => {
 });
 
 // Keep your existing catalog & meta handlers (they are already perfect)
-builder.defineCatalogHandler(require("./catalog.js"));   // ← if you split it, or keep the old one here
-builder.defineMetaHandler(require("./meta.js"));         // ← same
+builder.defineCatalogHandler();   // ← if you split it, or keep the old one here
+builder.defineMetaHandler());         // ← same
 
 // ====================== SERVER ======================
 serveHTTP(builder.getInterface(), { port: process.env.PORT || 10000 });
