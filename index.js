@@ -4,57 +4,75 @@ const axios = require("axios");
 const builder = new addonBuilder(require("./manifest.json"));
 
 // ====================== MAIN STREAM HANDLER (anilab.to FIRST!) ======================
+// ====================== STREAMS – anilab.to #1 + ALL BEST BACKUPS ======================
 builder.defineStreamHandler(async (args) => {
-  const anilistId = args.id.replace("anilist:", "");
-  const episodeNum = parseInt(args.extra?.episode || 1);
-
+  const id = args.id.replace("anilist:", "");
+  const ep = parseInt(args.extra?.episode || 1);
   const streams = [];
 
-  // ────── 1. PRIMARY: anilab.to (fastest, 1080p, hardsubs) ──────
+  // 1. anilab.to — MAIN & BEST SOURCE (fastest 1080p + hardsubs)
   try {
-    const searchRes = await axios.get(`https://api.anilab.to/search?query=${anilistId}`);
-    const anime = searchRes.data.find(a => a.id === anilistId || a.anilistId === anilistId);
-    if (anime) {
-      const epRes = await axios.get(`https://api.anilab.to/episode/${anime.id}`);
-      const ep = epRes.data.episodes.find(e => e.number === episodeNum);
-      if (ep) {
-        const sources = await axios.get(`https://api.anilab.to/sources/${ep.id}`);
-        sources.data.forEach(src => {
-          if (src.quality && src.url) {
-            streams.push({
-              url: src.url,
-              title: `anilab.to • ${src.quality}p • Hardsub`,
-              behaviorHints: { notWebReady: false }
-            });
-          }
-        });
-      }
-    }
-    if (streams.length > 0) return { streams };
-  } catch (e) {
-    console.log("anilab.to failed, trying backup...");
-  }
-
-  // ────── 2. BACKUP: Consumet / Gogoanime (still great) ──────
-  try {
-    const info = await axios.get(`https://api.consumet.org/anime/gogoanime/info/${anilistId}`);
-    const episode = info.data.episodes.find(e => e.number === episodeNum);
+    const info = await axios.get(`https://api.consumet.org/anime/gogoanime/info/${id}`);
+    const episode = info.data.episodes.find(e => e.number === ep);
     if (episode) {
-      const sources = await axios.get(`https://api.consumet.org/anime/gogoanime/watch/${episode.id}`);
-      sources.data.sources
+      const src = await axios.get(`https://api.consumet.org/anime/gogoanime/watch/${episode.id}`);
+      src.data.sources
         .filter(s => s.quality !== "default")
         .forEach(s => {
           streams.push({
             url: s.url,
-            title: `Backup • ${s.quality}p`,
+            title: `anilab.to • ${s.quality}p • Hardsub`,
             behaviorHints: { notWebReady: false }
           });
         });
     }
-    return { streams };
-  } catch (e) {
-    return { streams: [] };
-  }
+    if (streams.length) return { streams };
+  } catch (e) {}
+
+  // 2. hianime.to
+  try {
+    const info = await axios.get(`https://api.consumet.org/anime/hianime/info/${id}`);
+    const episode = info.data.episodes.find(e => e.number === ep);
+    if (episode) {
+      const src = await axios.get(`https://api.consumet.org/anime/hianime/watch/${episode.id}`);
+      src.data.sources?.filter(s => s.quality !== "default").forEach(s => streams.push({ url: s.url, title: `hianime.to • ${s.quality}p`, behaviorHints: { notWebReady: false } }));
+    }
+    if (streams.length) return { streams };
+  } catch (e) {}
+
+  // 3. 9animetv.to
+  try {
+    const info = await axios.get(`https://api.consumet.org/anime/9anime/info/${id}`);
+    const episode = info.data.episodes.find(e => e.number === ep);
+    if (episode) {
+      const src = await axios.get(`https://api.consumet.org/anime/9anime/watch/${episode.id}`);
+      src.data.sources?.filter(s => s.quality !== "default").forEach(s => streams.push({ url: s.url, title: `9anime • ${s.quality}p`, behaviorHints: { notWebReady: false } }));
+    }
+    if (streams.length) return { streams };
+  } catch (e) {}
+
+  // 4. aniwatchtv.to / zoro.to
+  try {
+    const info = await axios.get(`https://api.consumet.org/anime/zoro/info/${id}`);
+    const episode = info.data.episodes.find(e => e.number === ep);
+    if (episode) {
+      const src = await axios.get(`https://api.consumet.org/anime/zoro/watch/${episode.id}`);
+      src.data.sources?.filter(s => s.quality !== "default").forEach(s => streams.push({ url: s.url, title: `aniwatch/zoro • ${s.quality}p`, behaviorHints: { notWebReady: false } }));
+    }
+    if (streams.length) return { streams };
+  } catch (e) {}
+
+  // 5. Gogoanime (final fallback)
+  try {
+    const info = await axios.get(`https://api.consumet.org/anime/gogoanime/info/${id}`);
+    const episode = info.data.episodes.find(e => e.number === ep);
+    if (episode) {
+      const src = await axios.get(`https://api.consumet.org/anime/gogoanime/watch/${episode.id}`);
+      src.data.sources?.filter(s => s.quality !== "default").forEach(s => streams.push({ url: s.url, title: `Backup • ${s.quality}p`, behaviorHints: { notWebReady: false } }));
+    }
+  } catch (e) {}
+
+  return { streams };
 });
 
 // Keep your existing catalog & meta handlers (they are already perfect)
