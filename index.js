@@ -4,6 +4,7 @@ const axios = require("axios");
 const builder = new addonBuilder(require("./manifest.json"));
 const ANILIST = "https://graphql.anilist.co";
 
+// Current season helper
 const getCurrentSeason = () => {
   const m = new Date().getMonth() + 1;
   const y = new Date().getFullYear();
@@ -16,6 +17,7 @@ const getCurrentSeason = () => {
 // ====================== CATALOGS ======================
 builder.defineCatalogHandler(async (args) => {
   const metas = [];
+
   if (args.id.startsWith("cr-season-")) {
     const [s, y] = args.id.replace("cr-season-", "").toUpperCase().split("-");
     const { data } = await axios.post(ANILIST, {
@@ -46,6 +48,7 @@ builder.defineCatalogHandler(async (args) => {
       poster: a.coverImage.extraLarge
     }));
   }
+
   return { metas };
 });
 
@@ -71,7 +74,7 @@ builder.defineStreamHandler(async (args) => {
   const ep = parseInt(args.extra?.episode || 1);
   const streams = [];
 
-  // 1. anilab.to (MAIN & BEST)
+  // 1. anilab.to (MAIN & BEST – labeled as anilab.to)
   try {
     const info = await axios.get(`https://api.consumet.org/anime/gogoanime/info/${id}`);
     const episode = info.data.episodes.find(e => e.number === ep);
@@ -84,22 +87,22 @@ builder.defineStreamHandler(async (args) => {
     if (streams.length) return { streams };
   } catch (e) {}
 
-  // 2–5. hianime → 9anime → aniwatch → gogo
-  const sources = [
+  // 2–5. Best backups in order
+  const backups = [
     { name: "hianime.to", provider: "hianime" },
     { name: "9anime", provider: "9anime" },
     { name: "aniwatch/zoro", provider: "zoro" },
-    { name: "Backup", provider: "gogoanime" }
+    { name: "Gogoanime", provider: "gogoanime" }
   ];
 
-  for (const src of sources) {
+  for (const b of backups) {
     try {
-      const info = await axios.get(`https://api.consumet.org/anime/${src.provider}/info/${id}`);
+      const info = await axios.get(`https://api.consumet.org/anime/${b.provider}/info/${id}`);
       const episode = info.data.episodes.find(e => e.number === ep);
       if (episode) {
-        const res = await axios.get(`https://api.consumet.org/anime/${src.provider}/watch/${episode.id}`);
+        const res = await axios.get(`https://api.consumet.org/anime/${b.provider}/watch/${episode.id}`);
         res.data.sources?.filter(s => s.quality !== "default").forEach(s => {
-          streams.push({ url: s.url, title: `${src.name} • ${s.quality}p`, behaviorHints: { notWebReady: false } });
+          streams.push({ url: s.url, title: `${b.name} • ${s.quality}p`, behaviorHints: { notWebReady: false } });
         });
       }
       if (streams.length) return { streams };
@@ -109,10 +112,6 @@ builder.defineStreamHandler(async (args) => {
   return { streams };
 });
 
-// ====================== SERVER ======================
-serveHTTP(builder.getInterface(), { port: process.env.PORT || 10000 });
+// ====================== SERVER – FIXED FOR RENDER ======================
+serveHTTP(builder.getInterface(), { port: process.env.PORT });
 console.log("Crunchyroll Reborn + anilab.to + all backups is LIVE!");
-
-// ====================== SERVER ======================
-serveHTTP(builder.getInterface(), { port: process.env.PORT || 10000 });
-console.log("Crunchyroll Reborn + anilab.to is LIVE!");
