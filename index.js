@@ -3,7 +3,6 @@ const axios = require("axios");
 
 const manifest = require("./manifest.json");
 const builder = new addonBuilder(manifest);
-
 const ANILIST = "https://graphql.anilist.co";
 
 // Current season helper
@@ -20,22 +19,21 @@ const getCurrentSeason = () => {
 builder.defineCatalogHandler(async (args) => {
   const metas = [];
 
-  // Seasonal (Fall 2025, etc.)
   if (args.id.startsWith("cr-season-")) {
     const [season, yearStr] = args.id.replace("cr-season-", "").toUpperCase().split("-");
     const year = parseInt(yearStr);
-
-    const query = `
-      query($s: MediaSeason, $y: Int) {
-        Page(perPage: 50) {
-          media(season: $s, seasonYear: $y, type: ANIME, sort: POPULARITY_DESC) {
-            id title { romaji english } coverImage { extraLarge } bannerImage genres
+    const { data } = await axios.post(ANILIST, {
+      query: `
+        query($s: MediaSeason, $y: Int) {
+          Page(perPage: 50) {
+            media(season: $s, seasonYear: $y, type: ANIME, sort: POPULARITY_DESC) {
+              id title { romaji english } coverImage { extraLarge } bannerImage genres
+            }
           }
         }
-      }
-    `;
-
-    const { data } = await axios.post(ANILIST, { query, variables: { s: season, y: year } });
+      `,
+      variables: { s: season, y: year }
+    });
     data.data.Page.media.forEach(a => {
       metas.push({
         id: `anilist:${a.id}`,
@@ -48,19 +46,20 @@ builder.defineCatalogHandler(async (args) => {
     });
   }
 
-  // Simulcast
   else if (args.id === "cr-simulcast") {
     const { season, year } = getCurrentSeason();
-    const query = `
-      query($s: MediaSeason, $y: Int) {
-        Page(perPage: 30) {
-          media(season: $s, seasonYear: $y, isAdult: false, sort: POPULARITY_DESC, type: ANIME) {
-            id title { english romaji } coverImage { extraLarge }
+    const { data } = await axios.post(ANILIST, {
+      query: `
+        query($s: MediaSeason, $y: Int) {
+          Page(perPage: 30) {
+            media(season: $s, seasonYear: $y, isAdult: false, sort: POPULARITY_DESC, type: ANIME) {
+              id title { english romaji } coverImage { extraLarge }
+            }
           }
         }
-      }
-    `;
-    const { data } = await axios.post(ANILIST, { query, variables: { s: season, y: year } });
+      `,
+      variables: { s: season, y: year }
+    });
     data.data.Page.media.forEach(a => {
       metas.push({
         id: `anilist:${a.id}`,
@@ -71,7 +70,6 @@ builder.defineCatalogHandler(async (args) => {
     });
   }
 
-  // Popular & Updated
   else if (args.id === "cr-popular" || args.id === "cr-updated") {
     const { data } = await axios.post(ANILIST, {
       query: `query { Page(perPage: 50) { media(sort: POPULARITY_DESC, type: ANIME) { id title { english romaji } coverImage { extraLarge } } } }`,
@@ -89,14 +87,24 @@ builder.defineCatalogHandler(async (args) => {
   return { metas };
 });
 
-// ====================== META ======================
+// ====================== META – MDBLIST + RPDB SUPPORT ======================
 builder.defineMetaHandler(async (args) => {
   const id = args.id.replace("anilist:", "");
+
+  // Get basic data from AniList
   const { data } = await axios.post(ANILIST, {
     query: `
       query($id: Int) {
         Media(id: $id, type: ANIME) {
-          id title { english romaji } coverImage { large } bannerImage description(asHtml: false) genres season seasonYear duration
+          id
+          title { english romaji }
+          coverImage { large }
+          bannerImage
+          description(asHtml: false)
+          genres
+          season
+          seasonYear
+          duration
         }
       }
     `,
@@ -104,13 +112,33 @@ builder.defineMetaHandler(async (args) => {
   });
 
   const a = data.data.Media;
+
+  let poster = a.coverImage.large;
+  let background = a.bannerImage || a.coverImage.large;
+
+  // MDBList – better backdrops & extra info
+  if (process.env.MDBLIST_API_KEY) {
+    try {
+      const res = await axios.get(
+        `https://mdblist.com/api/?apikey=${process.env.MDBLIST_API_KEY}&i=${a.id}`
+      );
+      if (res.data?.poster && res.data.poster.includes("http")) poster = res.data.poster;
+      if (res.data?.backdrop && res.data.backdrop.includes("http")) background = res.data.backdrop;
+    } catch (e) {}
+  }
+
+  // RPDB – BEST POSTERS IN THE WORLD (overrides everything)
+  if (process.env.RPDB_API_KEY) {
+    poster = `https://api.requestposterdb.com/poster/${process.env.RPDB_API_KEY}/${a.id}?fallback=true`;
+  }
+
   return {
     meta: {
       id: `anilist:${a.id}`,
       type: "series",
       name: a.title.english || a.title.romaji,
-      poster: a.coverImage.large,
-      background: a.bannerImage || a.coverImage.large,
+      poster: poster,
+      background: background,
       description: a.description?.replace(/<[^>]*>/g, ""),
       genres: a.genres,
       releaseInfo: `${a.season} ${a.seasonYear}`,
@@ -119,7 +147,7 @@ builder.defineMetaHandler(async (args) => {
   };
 });
 
-// ====================== STREAMS ======================
+// ====================== STREAMS (Fast & stable via Consumet) ======================
 builder.defineStreamHandler(async (args) => {
   const anilistId = args.id.replace("anilist:", "");
   const ep = parseInt(args.extra?.episode || 1);
@@ -144,6 +172,6 @@ builder.defineStreamHandler(async (args) => {
   }
 });
 
-// ====================== SERVER ======================
-serveHTTP(builder.getInterface(), { port: process.env.PORT || 10000 });
-console.log("Crunchyroll Reborn add-on is running!");
+// ====================== SERVER – RENDER READY ======================
+serveHTTP(builder.getInterface(), { port: process.env.PORT });
+console.log("Crunchyroll Reborn + MDBList + RPDB is running!");
